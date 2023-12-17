@@ -15,13 +15,15 @@ data = pd.read_csv('test.txt', index_col=False, sep=' ', header=None)
 def keras_restore_signal(distorted_signal, noise):
     # Преобразуем данные в формат TensorFlow
     distorted_signal = tf.expand_dims(distorted_signal, axis=0)
+    print(noise.shape)
     noise = tf.expand_dims(noise, axis=0)
 
     model = tf.keras.Sequential([
-        tf.keras.layers.Conv1D(1, 40, 1, input_shape=(distorted_signal.shape[1], 1), padding='same')
+        tf.keras.layers.Conv1D(1, 41, 1, input_shape=(distorted_signal.shape[1], 1), padding='same')
     ])
 
-    model.compile(loss='mean_squared_error', optimizer='sgd')
+    model.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.SGD(learning_rate=0.00000000001))
+    print(noise.shape)
     model.fit(noise, distorted_signal, epochs=500, batch_size=64)
     restored_signal = model.predict(distorted_signal)
 
@@ -32,7 +34,7 @@ def tensorflow_restore_signal(distorted_signal, noise):
     errors = []
     tC_values = []
     mu = 0.00000000001
-    M = 200  # Память фильтра -M..M
+    M = 120  # Память фильтра -M..M
     N = len(noise)  # Длина входного вектора
     X = np.zeros((N, 2 * M + 2), dtype=np.float64)
     idx = 0
@@ -102,11 +104,11 @@ def tensorflow_restore_signal(distorted_signal, noise):
 # и выходного сигнала на каждом временном шаге
 
 
-distorted_signal = data[0].to_numpy().flatten()
-#distorted_signal = data.iloc[200:7000, 0].to_numpy().flatten()
+#distorted_signal = data[0].to_numpy().flatten()
+distorted_signal = data.iloc[200:14000, 0].to_numpy().flatten()
 distorted_signal -= np.mean(distorted_signal)
-noise = data[2].to_numpy().flatten()
-#noise = data.iloc[200:7000, 2].to_numpy().flatten()
+#noise = data[2].to_numpy().flatten()
+noise = data.iloc[200:14000, 2].to_numpy().flatten()
 noise -= np.mean(noise)
 
 data = pd.DataFrame()
@@ -137,5 +139,5 @@ ay.set_title('После обработки tensorflow')
 # fig3, ad = plt.subplots()
 # data3.plot(ax=ad)
 # ad.set_title('После обработки keras')
-
+#
 plt.show()
