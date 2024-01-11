@@ -23,11 +23,9 @@ def keras_restore_signal(distorted_signal, noise):
     ])
 
     model.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.SGD(learning_rate=0.00000000001)) # mean_squared_error - Эта функция оценивает среднеквадратичную разницу между ожидаемыми и предсказанными значениями.
-    print(noise.shape)
-    model.fit(noise, distorted_signal, epochs=500, batch_size=64)
+    history = model.fit(noise, distorted_signal, epochs=500, batch_size=64)
     restored_signal = model.predict(distorted_signal)
-
-    return restored_signal
+    return restored_signal , history
 
 
 def tensorflow_restore_signal(distorted_signal, noise):
@@ -121,13 +119,22 @@ ay2.legend(['c'])
 
 
 
-# keras_restored_signal = keras_restore_signal(distorted_signal, noise)
-#
-# keras_data = pd.DataFrame()
-# keras_data.insert(0, 0, keras_restored_signal[0].reshape(-1))
-# keras_data.insert(1, 1, noise)
-# fig_keras_data, ad = plt.subplots()
-# keras_data.plot(ax=ad)
-# ad.set_title('После обработки keras')
+keras_restored_signal = keras_restore_signal(distorted_signal, noise)
+
+keras_data = pd.DataFrame()
+keras_data.insert(0, 0, distorted_signal)
+keras_data.insert(1, 1, keras_restored_signal[0][0].reshape(-1))
+fig_keras_data, ad = plt.subplots()
+keras_data.plot(ax=ad, color=['#1F77B4', '#800080'])
+ad.set_title('После обработки keras')
+ad.legend(['До', 'После'])
+
+keras_loss_data = pd.DataFrame()
+keras_loss_data.insert(0, 0, keras_restored_signal[1].history['loss'])
+fig_keras_loss_data, ad1 = plt.subplots()
+keras_loss_data.plot(ax=ad1)
+ad1.set_title('loss keras')
+ad1.legend(['loss'])
+
 
 plt.show()
