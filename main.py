@@ -22,7 +22,7 @@ def keras_restore_signal(distorted_signal, noise):
         tf.keras.layers.Conv1D(1, 41, 1, input_shape=(distorted_signal.shape[1], 1), padding='same')
     ])
 
-    model.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.SGD(learning_rate=0.00000000001))
+    model.compile(loss='mean_squared_error', optimizer=tf.keras.optimizers.SGD(learning_rate=0.00000000001)) # mean_squared_error - Эта функция оценивает среднеквадратичную разницу между ожидаемыми и предсказанными значениями.
     print(noise.shape)
     model.fit(noise, distorted_signal, epochs=500, batch_size=64)
     restored_signal = model.predict(distorted_signal)
@@ -32,7 +32,7 @@ def keras_restore_signal(distorted_signal, noise):
 
 def tensorflow_restore_signal(distorted_signal, noise):
     errors = []
-    tC_values = []
+    coef_changes = []
     mu = 0.00000000001
     M = 120  # Память фильтра -M..M
     N = len(noise)  # Длина входного вектора
@@ -59,46 +59,18 @@ def tensorflow_restore_signal(distorted_signal, noise):
         with tf.GradientTape() as g:
             tY = tf.matmul(tX, tC)[0, 0] # матричиное умножение tX[m:m+1, :] и tC в тензор tY (выходной сигнал), предсказание y
             tEps = tD - tY # ошибка в точке m (разница между ожидаемым выходом и предсказанным)
-            tQ = tEps * tEps # функция стоимости, квадрат ошибки tEps, оценка ошибки предсказания
+            tQ = tEps * tEps # функция стоимости, квадрат ошибки tEps, оценка ошибки предсказания ( Эта функция потерь представляет квадрат разницы между ожидаемым выходом фильтра и предсказанным выходом для каждой итерации )
             grad = g.gradient(tQ, tC) # градиент функции tQ по отношению к tC
             tC.assign(tC - tf.math.scalar_mul(mu, grad)) # обновление tC с помощью градиентного спуска
-        return tY
-    # print(tC.numpy()[:, 0])
-    # datatc = pd.DataFrame()
-    # datatc.insert(0, 0, tC.numpy()[:, 0])
-    # fig, axtc = plt.subplots()
-    # datatc.plot(ax=axtc)
-    # ax.set_title('tc')
-    # plt.show()
+        return tY, tQ
+
     for n in range(N):
-        tY = train_step(tX[n:n + 1, :], tC, tD[n])
-        y[n] = tY.numpy() # значение tY присваивается элементу n выходного сигнала y
-        C[:, n] = tC.numpy()[:, 0] # значение tC присваивается n-ному столбцу матрицы C
-        #tC_values.append(tC.numpy()[:, 0])
-        #print("tC on step", n+1, ":", tC.numpy())
-        error = np.square(distorted_signal[n] - y[n])
-        errors.append(error)
-    error = pd.DataFrame(errors)
-    fig_errors, az = plt.subplots()
-    error.plot(ax=az)
-    az.set_title('График адаптации для ошибки')
-    # tC_values = np.array(tC_values)
-    # total = []
-    # total = np.array(total)
-    # for i in tC_values:
-    #     total = np.concatenate((total, i))
-    # print(len(total))
-    # coef = pd.DataFrame(total)
-    # fig_coef, cf = plt.subplots()
-    # coef.plot(ax=cf)
-    # cf.set_title('График адаптации коэффициентов')
-
-    return y
-
-
-
-
-
+        tY, tQ = train_step(tX[n:n + 1, :], tC, tD[n])
+        y[n] = tY.numpy()
+        C[:, n] = tC.numpy()[:, 0]
+        errors.append(tQ.numpy())
+        coef_changes.append(tC.numpy()[:, 0])
+    return y, errors, coef_changes
 
 # С помощью метода МНК происходит обучение фильтра для аппроксимации входного сигнала и запись коэффициентов фильтра
 # и выходного сигнала на каждом временном шаге
@@ -114,30 +86,48 @@ noise -= np.mean(noise)
 data = pd.DataFrame()
 data.insert(0, 0, distorted_signal)
 data.insert(1, 1, noise)
-fig, ax = plt.subplots()
+fig_data, ax = plt.subplots()
 data.plot(ax=ax)
 ax.set_title('До обработки')
-
+ax.legend(['Сигнал + Шум', 'Шум'])
 
 
 tensorflow_restored_signal = tensorflow_restore_signal(distorted_signal, noise)
 
-
-data2 = pd.DataFrame()
-data2.insert(0, 0, distorted_signal)
-data2.insert(1, 1, tensorflow_restored_signal)
-fig2, ay = plt.subplots()
-data2.plot(ax=ay)
+tensorflow_data = pd.DataFrame()
+tensorflow_data.insert(0, 0, distorted_signal)
+tensorflow_data.insert(1, 1, tensorflow_restored_signal[0])
+fig_tensorflow_data, ay = plt.subplots()
+tensorflow_data.plot(ax=ay, color=['#1F77B4', '#800080'])
 ay.set_title('После обработки tensorflow')
+ay.legend(['До', 'После'])
+
+tensorflow_lossdata = pd.DataFrame()
+tensorflow_lossdata.insert(0, 0, tensorflow_restored_signal[1])
+fig_tensorflow_lossdata, ay1 = plt.subplots()
+tensorflow_lossdata.plot(ax=ay1, color='black')
+ay1.set_title('tensorflow loss \n Квадрат разницы между ожидаемым выходом фильтра \n и предсказанным выходом для каждой итерации')
+ay1.legend(['loss'])
+
+coef_changes = np.array(tensorflow_restored_signal[2])
+num_cycles = coef_changes.shape[0]
+num_coefs = coef_changes.shape[1]
+fig_tensorflow_c_data, ay2 = plt.subplots()
+
+for i in range(num_coefs):
+    ay2.plot(range(num_cycles), coef_changes[:, i], label='Coefficient {}'.format(i+1))
+ay2.set_title('tensorflow коэффициенты ')
+ay2.legend(['c'])
+
 
 
 # keras_restored_signal = keras_restore_signal(distorted_signal, noise)
 #
-# data3 = pd.DataFrame()
-# data3.insert(0, 0, keras_restored_signal[0].reshape(-1))
-# data3.insert(1, 1, noise)
-# fig3, ad = plt.subplots()
-# data3.plot(ax=ad)
+# keras_data = pd.DataFrame()
+# keras_data.insert(0, 0, keras_restored_signal[0].reshape(-1))
+# keras_data.insert(1, 1, noise)
+# fig_keras_data, ad = plt.subplots()
+# keras_data.plot(ax=ad)
 # ad.set_title('После обработки keras')
-#
+
 plt.show()
